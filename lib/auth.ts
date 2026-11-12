@@ -8,5 +8,4 @@ export const authOptions: NextAuthOptions = {
     async signIn({ profile }) { return Boolean(profile?.email && profile.email.toLowerCase() === process.env.OWNER_EMAIL?.toLowerCase()); },
     async session({ session }) { return session; },
   },
-  pages: { signIn: "/api/auth/signin" },
 };
