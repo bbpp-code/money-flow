@@ -70,7 +70,7 @@ Download CSV from the Reports tab and use Supabase database backups for full rec
 ## Security notes
 
 - `.env*`, credentials, and logs are ignored. Only hashes of device tokens belong in environment configuration.
-- The Supabase service role key stays on the server. RLS is enabled with no client policies.
+- The Supabase secret key stays on the server. RLS is enabled with no client policies.
 - The optional Google service account needs historical Doc viewer access only.
 - `NEXTAUTH_SECRET` signs sessions and import preview tokens.
 - The in-memory limiter is appropriate for a private single-instance deployment. For horizontally scaled public ingress, add a shared rate-limit store and single-writer queue; Sheets itself cannot enforce unique keys atomically across instances.

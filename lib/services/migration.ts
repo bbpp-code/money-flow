@@ -8,8 +8,24 @@ function secret() { return new TextEncoder().encode(process.env.NEXTAUTH_SECRET 
 
 export async function readGoogleDoc(docId: string) {
   const response = await getDocsClient().documents.get({ documentId: docId });
-  const text = (response.data.body?.content ?? []).map((item) => item.paragraph?.elements?.map((element) => element.textRun?.content ?? "").join("") ?? "").join("");
-  return { title: response.data.title ?? "", text };
+  const paragraphs = (response.data.body?.content ?? []).map((item) => ({
+    startIndex: item.startIndex,
+    text: item.paragraph?.elements?.map((element) => element.textRun?.content ?? "").join("") ?? "",
+  }));
+  const text = paragraphs.map((item) => item.text).join("");
+  const entries = extractDocumentEntries(paragraphs);
+  return { title: response.data.title ?? "", text, entries };
+}
+
+export function extractDocumentEntries(paragraphs: Array<{ startIndex?: number | null; text: string }>) {
+  return paragraphs.flatMap((paragraph) => {
+    let offset = 0;
+    return paragraph.text.split("\n").map((part) => {
+      const entry = { text: part.trim(), startIndex: paragraph.startIndex == null ? undefined : paragraph.startIndex + offset };
+      offset += part.length + 1;
+      return entry;
+    }).filter((entry) => entry.text);
+  });
 }
 
 const HEADING = /^(?:วันที่\s*)?(\d{1,2})\s*(มกราคม|มกรา|กุมภาพันธ์|กุมภา|มีนาคม|มีนา|เมษายน|เมษา|พฤษภาคม|พฤษภา|มิถุนายน|มิถุนา|กรกฎาคม|กรกฎา|สิงหาคม|สิงหา|กันยายน|กันยา|ตุลาคม|ตุลา|พฤศจิกายน|พฤศจิกา|ธันวาคม|ธันวา)(?:\s*(\d{4}))?$/iu;
@@ -21,14 +37,15 @@ const SUMMARY_LINE = /^(?:รวม|ยอดรวม|สรุป|total|subtot
 export async function buildMigrationPreview(docId: string) {
   const document = await readGoogleDoc(docId);
   const repository = await getRepository();
-  const lines = document.text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const lines = document.entries;
   let heading = "";
   let monthHeading = "";
   let currentMonth = /เดือน\s*10|ตุลาคม/u.test(document.title) ? 10 : Number(new Date().toLocaleDateString("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }));
   let currentYear = Number(new Date().toLocaleDateString("en-US", { timeZone: "Asia/Tokyo", year: "numeric" }));
   const occurrences = new Map<string, number>();
   const items: Array<Record<string, unknown>> = [];
-  for (const [index, line] of lines.entries()) {
+  for (const [index, entry] of lines.entries()) {
+    const line = entry.text;
     if (HEADING.test(line)) { heading = line; continue; }
     if (MONTH_HEADING.test(line)) { monthHeading = line; heading = line; continue; }
     const numbered = line.match(NUMBERED_HEADING);
@@ -49,7 +66,7 @@ export async function buildMigrationPreview(docId: string) {
     const occurrence = (occurrences.get(identity) ?? 0) + 1;
     occurrences.set(identity, occurrence);
     const fingerprint = createHash("sha256").update(`${docId}|${identity}|${occurrence}`).digest("hex");
-    const reference = `gdoc:${docId}:${fingerprint}`;
+    const reference = `gdoc:${docId}:${entry.startIndex ?? fingerprint}`;
     const duplicate = (await repository.findBySourceReference(reference)).length > 0;
     try {
       const parsed = parsePhrase(`${heading} ${line}`.trim());

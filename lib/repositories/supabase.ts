@@ -9,15 +9,15 @@ export class SupabaseRepository implements FinanceRepository {
   private readonly key: string;
   constructor() {
     this.url = process.env.SUPABASE_URL?.replace(/\/$/, "") || "";
-    this.key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-    if (!/^https:\/\/.+\.supabase\.co$/.test(this.url) || !this.key) throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
+    this.key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    if (!/^https:\/\/.+\.supabase\.co$/.test(this.url) || !this.key) throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY are required");
   }
 
   private async request<T>(table: string, query = "", init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.url}/rest/v1/${table}${query}`, {
       ...init,
       headers: {
-        apikey: this.key, Authorization: `Bearer ${this.key}`,
+        apikey: this.key,
         "content-type": "application/json", Prefer: "return=representation",
         ...init.headers,
       },

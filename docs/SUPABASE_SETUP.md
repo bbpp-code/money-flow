@@ -1,7 +1,7 @@
 # Supabase setup and data migration
 
 1. Create a Supabase project in a region appropriate for your use. In **SQL Editor**, run [`supabase/schema.sql`](../supabase/schema.sql). This creates the ledger, category rules, budgets, FX cache, report history, unique source references, and row-level security.
-2. In **Project Settings → Data API**, copy the Project URL to `SUPABASE_URL`. In **Project Settings → API Keys**, copy the server-side `service_role` key to `SUPABASE_SERVICE_ROLE_KEY`. Store both in Netlify environment variables and `.env.local` for local work. Never use the service role key in a Shortcut, browser variable, or Git.
+2. In **Project Settings → Data API**, copy the Project URL to `SUPABASE_URL`. In **Project Settings → API Keys**, copy the server-side secret key to `SUPABASE_SECRET_KEY`. Store both in Netlify environment variables and `.env.local` for local work. Never use the secret key in a Shortcut, browser variable, or Git. The older `SUPABASE_SERVICE_ROLE_KEY` remains supported only for migration compatibility.
 3. Set `DEMO_MODE=false` and `DATA_BACKEND=supabase`. The existing owner-only Google OAuth values remain necessary for the dashboard login. The Google service account is only needed if importing the historical Google Doc.
 4. Deploy, sign in, then submit one ¥1 test through the Shortcut or manual form. Confirm the row in `public.transactions`; check that retrying the same `client_request_id` does not create another row.
 5. To import the historical Doc, share it with the service account as Viewer, call `/api/migration/docs/preview`, inspect dates, ambiguous lines and totals, then explicitly commit the preview. The original Doc is never changed. The importer writes to Supabase when `DATA_BACKEND=supabase`.
