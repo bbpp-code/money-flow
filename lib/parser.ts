@@ -64,7 +64,7 @@ export function parsePhrase(input: string, options: { now?: Date; rules?: Catego
   for (const [pattern, code] of CURRENCIES) if (pattern.test(text)) { currency = code; currencyInferred = false; break; }
 
   const date = dateAtTokyo(text, options.now ?? new Date());
-  const type = /เงินเดือนเข้า|รายรับ|รับเงิน|salary|income|給与/iu.test(text) ? "income" : "expense";
+  const type = /เงินเดือนเข้า|รายรับ|รับเงิน|งานวันเกิด.*เข้า\s*\d|(?:^|\s)เข้า\s*\d|salary|income|給与/iu.test(text) ? "income" : "expense";
   let description = originalText;
   description = description.replace(new RegExp(`${amountMatch[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(?:บาท|thb|เยน|jpy|円|ดอลลาร์(?:สหรัฐ)?|usd|\\$|ยูโร|eur|€)?`, "iu"), "");
   description = description.replace(/(?:วันนี้|เมื่อวาน|today|yesterday|昨日)/giu, "")

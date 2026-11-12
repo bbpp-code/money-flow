@@ -15,6 +15,7 @@ export async function readGoogleDoc(docId: string) {
 const HEADING = /^(?:วันที่\s*)?(\d{1,2})\s*(มกราคม|มกรา|กุมภาพันธ์|กุมภา|มีนาคม|มีนา|เมษายน|เมษา|พฤษภาคม|พฤษภา|มิถุนายน|มิถุนา|กรกฎาคม|กรกฎา|สิงหาคม|สิงหา|กันยายน|กันยา|ตุลาคม|ตุลา|พฤศจิกายน|พฤศจิกา|ธันวาคม|ธันวา)(?:\s*(\d{4}))?$/iu;
 const MONTH_HEADING = /^(มกราคม|มกรา|กุมภาพันธ์|กุมภา|มีนาคม|มีนา|เมษายน|เมษา|พฤษภาคม|พฤษภา|มิถุนายน|มิถุนา|กรกฎาคม|กรกฎา|สิงหาคม|สิงหา|กันยายน|กันยา|ตุลาคม|ตุลา|พฤศจิกายน|พฤศจิกา|ธันวาคม|ธันวา)(?:\s*(\d{4}))?$/iu;
 const DAY_HEADING = /^(?:วันที่|วัน)\s*(\d{1,2})$/iu;
+const NUMBERED_HEADING = /^(?:วันที่|วัน)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{4}))?$/iu;
 const SUMMARY_LINE = /^(?:รวม|ยอดรวม|สรุป|total|subtotal|คงเหลือ)/iu;
 
 export async function buildMigrationPreview(docId: string) {
@@ -23,13 +24,24 @@ export async function buildMigrationPreview(docId: string) {
   const lines = document.text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   let heading = "";
   let monthHeading = "";
+  let currentMonth = /เดือน\s*10|ตุลาคม/u.test(document.title) ? 10 : Number(new Date().toLocaleDateString("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }));
+  let currentYear = Number(new Date().toLocaleDateString("en-US", { timeZone: "Asia/Tokyo", year: "numeric" }));
   const occurrences = new Map<string, number>();
   const items: Array<Record<string, unknown>> = [];
   for (const [index, line] of lines.entries()) {
     if (HEADING.test(line)) { heading = line; continue; }
     if (MONTH_HEADING.test(line)) { monthHeading = line; heading = line; continue; }
+    const numbered = line.match(NUMBERED_HEADING);
+    if (numbered) {
+      currentMonth = Number(numbered[2]);
+      currentYear = numbered[3] ? Number(numbered[3]) : currentYear;
+      monthHeading = "";
+      heading = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${numbered[1].padStart(2, "0")}`;
+      continue;
+    }
+    if (/^วันที่สอง$/u.test(line)) { heading = `${currentYear}-${String(currentMonth).padStart(2, "0")}-02`; continue; }
     const dayMatch = line.match(DAY_HEADING);
-    if (dayMatch && monthHeading) { heading = `${dayMatch[1]} ${monthHeading}`; continue; }
+    if (dayMatch) { heading = monthHeading ? `${dayMatch[1]} ${monthHeading}` : `${currentYear}-${String(currentMonth).padStart(2, "0")}-${dayMatch[1].padStart(2, "0")}`; continue; }
     if (SUMMARY_LINE.test(line)) continue;
     if (!/\d/.test(line)) continue;
     const original = line;

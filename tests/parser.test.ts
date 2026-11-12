@@ -19,6 +19,7 @@ describe("Thai transaction parser", () => {
     expect(result).toMatchObject({ description, currency, category, subcategory, type, date: "2026-11-12" });
   });
   it("flags ambiguous convenience-store purchases", () => expect(parsePhrase("ซื้อของเซเว่น 1200 เยน", { now }).reviewStatus).toBe("needs_review"));
+  it("recognizes an informal income entry from the historical document", () => expect(parsePhrase("งานวันเกิดพี่อ้ายเข้า 4000 เยน", { now }).type).toBe("income"));
   it("marks an omitted currency as inferred JPY", () => expect(parsePhrase("ชาบู 4100", { now })).toMatchObject({ currency: "JPY", currencyInferred: true }));
   it("splits two transactions in one sentence", () => expect(parseVoiceText("กาแฟ 250 เยน และ ค่าทางด่วน 1200 เยน", { now })).toHaveLength(2));
   it("never invents a missing amount", () => expect(() => parsePhrase("ซื้อกาแฟ", { now })).toThrowError(ParseError));
