@@ -5,11 +5,11 @@ The API accepts Thai UTF-8 and keeps the existing “dictate then POST” shape.
 ## Direct secure API — exact actions
 
 1. Add **Dictate Text**. Language: **Thai (Thailand)**. Stop Listening: **After Pause**.
-2. Add **Generate UUID**. Rename its magic variable to `Client Request ID`.
+2. Add **Current Date**, then **Format Date**. In Format Date, choose **Custom** and enter `yyyyMMddHHmmssSSS` as the format string. This produces a request ID such as `20261113142307158` using built-in actions. Keep these actions before the network request so a retry of the same request reuses the same ID.
 3. Add **Dictionary** with:
    - `text` → the **Dictated Text** magic variable
    - `source` → Text value `iphone_shortcut`
-   - `client_request_id` → the **Client Request ID** magic variable
+   - `client_request_id` → the **Formatted Date** magic variable (select the variable; do not type its name)
 4. Add **Get Contents of URL**.
    - URL: `https://YOUR_DOMAIN/api/transactions/voice`
    - Method: `POST`
@@ -21,15 +21,15 @@ The API accepts Thai UTF-8 and keeps the existing “dictate then POST” shape.
 7. Inside If: add **Get Dictionary Value**, key `confirmation_th`, then **Speak Text** and optionally **Show Notification** using that value.
 8. Inside Otherwise: add **Get Dictionary Value**, key `error`; then another **Get Dictionary Value**, key `message_th`; use **Show Alert**. This prevents a failed request from sounding saved.
 
-Do not reuse the UUID after the Shortcut has confirmed success. If iOS retries the same network action, reuse the same UUID: the API returns the prior saved record with `duplicate: true`.
+Do not reuse the request ID after the Shortcut has confirmed success. If iOS retries the same network action, reuse the same formatted date value: the API returns the prior saved record with `duplicate: true`.
 
 ## Request and response
 
 ```json
-{"text":"กาแฟ 250 เยน","source":"iphone_shortcut","client_request_id":"5D6B..."}
+{"text":"กาแฟ 250 เยน","source":"iphone_shortcut","client_request_id":"20261113142307158"}
 ```
 
-Success is returned only after the sheet write succeeds:
+Success is returned only after the Supabase write succeeds:
 
 ```json
 {
@@ -45,6 +45,6 @@ Success is returned only after the sheet write succeeds:
 
 ## Existing Apps Script endpoint
 
-No Apps Script URL/source was supplied, so its exact legacy request format could not be inspected. Before replacing it, duplicate the existing Shortcut and test the direct endpoint. If keeping the old URL is important, paste `integrations/apps-script-adapter.gs` into the existing project and retain its incoming `text` field. Store `ADAPTER_SECRET`, `MONEYFLOW_DEVICE_TOKEN`, and `MONEYFLOW_API_URL` in **Project Settings → Script properties**, never in source.
+The legacy Apps Script endpoint is visible in the user's Shortcut, but its source and actual request format have not been inspected. Before replacing it, duplicate the existing Shortcut and test the direct endpoint. Do not concatenate the old Apps Script URL and the new MoneyFlow URL in one URL action. If keeping the old URL is important, inspect its current script first, then adapt `integrations/apps-script-adapter.gs` to the existing request format. Store `ADAPTER_SECRET`, `MONEYFLOW_DEVICE_TOKEN`, and `MONEYFLOW_API_URL` in **Project Settings → Script properties**, never in source.
 
-Deploy as **Web app**, execute as the owner, and choose access appropriate to the Shortcut. The adapter still rejects requests without `adapter_secret`. Apps Script `ContentService` responds through a `script.googleusercontent.com` redirect; **Get Contents of URL** follows it, and the adapter also enables redirects when forwarding. Test with a harmless ¥1 entry and verify the sheet before switching the production Shortcut.
+Deploy as **Web app**, execute as the owner, and choose access appropriate to the Shortcut. The adapter still rejects requests without `adapter_secret`. Apps Script `ContentService` responds through a `script.googleusercontent.com` redirect; **Get Contents of URL** follows it, and the adapter also enables redirects when forwarding. Test with a harmless ¥1 entry and verify the Supabase row before switching the production Shortcut.
