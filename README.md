@@ -1,13 +1,13 @@
 # MONEYFLOW JAPAN
 
-A private, Thai-first personal-finance app for life in Japan: Siri/Apple Shortcuts → secure voice API → deterministic parsing/categorization → Google Sheets → mobile dashboard. JPY is the reporting currency and Asia/Tokyo is the accounting timezone.
+A private, Thai-first personal-finance app for life in Japan: Siri/Apple Shortcuts → secure voice API → deterministic parsing/categorization → Supabase Postgres → mobile dashboard. JPY is the reporting currency and Asia/Tokyo is the accounting timezone.
 
 ## What works
 
 - Thai/Japanese/English transaction parsing, explicit dates, multi-phrase input, JPY default metadata, stable UUIDs
 - user rules before deterministic category scoring; ambiguous entries go to review
 - revocable device authentication, validation, rate limiting, duplicate retry protection, serialized writes
-- Google Sheets schema/setup and server-only access; owner-only Google OAuth dashboard
+- Supabase Postgres schema and server-only access; owner-only Google OAuth dashboard
 - transaction search/edit/manual entry, category budgets, charts, CSV, accurate browser-rendered Thai PNG
 - historical FX lookup/cache with original money preserved and missing-rate flags
 - Google Docs read-only preview/confirmed idempotent import
@@ -35,11 +35,11 @@ Demo data is synthetic and memory-only. It resets when the server restarts.
 
 ## Live setup
 
-1. Follow [Google configuration](docs/GOOGLE_SETUP.md).
-2. Run `npm run sheets:setup`; save the printed spreadsheet ID.
+1. Follow [Supabase setup](docs/SUPABASE_SETUP.md) and run `supabase/schema.sql` in its SQL editor.
+2. Configure owner-only OAuth in [Google configuration](docs/GOOGLE_SETUP.md). Google access is only for login and the optional historical Doc importer.
 3. Configure the [Apple Shortcut](docs/APPLE_SHORTCUT.md).
-4. Set `DEMO_MODE=false`, start the app, sign in as `OWNER_EMAIL`, and submit a ¥1 test.
-5. Verify `Transactions`, then preview the Doc migration. Keep the Doc unchanged as an archive.
+4. Set `DEMO_MODE=false`, `DATA_BACKEND=supabase`, and the Supabase server credentials. Submit a ¥1 test.
+5. Verify the row in Supabase, then preview the historical Doc migration. Keep the Doc unchanged as an archive.
 
 See [architecture and reliability notes](docs/ARCHITECTURE.md).
 
@@ -65,12 +65,13 @@ The scheduler upserts one `ReportSnapshots` row per date. It does not touch Chat
 
 ## Backups and recovery
 
-Download CSV from the Reports tab and use Google Sheets version history/Drive export for full backups. Because transactions retain stable IDs and source references, restored rows remain auditable. Never sort/edit headers or use row positions as IDs.
+Download CSV from the Reports tab and use Supabase database backups for full recovery. Because transactions retain stable IDs and source references, restored rows remain auditable.
 
 ## Security notes
 
 - `.env*`, credentials, and logs are ignored. Only hashes of device tokens belong in environment configuration.
-- The service account gets Sheet editor and historical Doc viewer access only.
+- The Supabase service role key stays on the server. RLS is enabled with no client policies.
+- The optional Google service account needs historical Doc viewer access only.
 - `NEXTAUTH_SECRET` signs sessions and import preview tokens.
 - The in-memory limiter is appropriate for a private single-instance deployment. For horizontally scaled public ingress, add a shared rate-limit store and single-writer queue; Sheets itself cannot enforce unique keys atomically across instances.
 - Current production dependency audit: run `npm audit --omit=dev` during each deployment.

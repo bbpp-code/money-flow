@@ -38,7 +38,7 @@ export async function ingestVoice(payload: { text: string; source: string; clien
         confidence: item.confidence, review_status: reviewStatus, notes: notes.join(","), updated_at: timestamp,
       });
     }
-    await repository.createTransactions(records);
-    return { transactions: records, duplicate: false };
+    const persisted = await repository.createTransactions(records);
+    return { transactions: persisted, duplicate: persisted.some((record, index) => record.transaction_id !== records[index].transaction_id) };
   });
 }
