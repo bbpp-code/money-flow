@@ -31,12 +31,23 @@ export class SupabaseRepository implements FinanceRepository {
     return response.status === 204 ? [] as T : await response.json() as T;
   }
 
-  async listTransactions(filters: { month?: string; query?: string; category?: string } = {}) {
-    const params = new URLSearchParams({ select: "*", order: "date.desc,created_at.desc" });
+  async listTransactions(filters: Parameters<FinanceRepository["listTransactions"]>[0] = {}) {
+    const params = new URLSearchParams({ select: "*", order: "date.desc,created_at.desc,transaction_id.desc" });
     if (filters.month) { params.set("date", `gte.${filters.month}-01`); params.append("date", `lt.${nextMonth(filters.month)}-01`); }
     if (filters.category) params.set("category", `eq.${filters.category}`);
     if (filters.query) params.set("description", `ilike.*${filters.query.replace(/[%*]/g, "")}*`);
-    return this.request<TransactionRecord[]>("transactions", `?${params}`);
+    if (filters.id) {
+      params.set("transaction_id", `eq.${filters.id}`);
+      return this.request<TransactionRecord[]>("transactions", `?${params}`);
+    }
+    const rows: TransactionRecord[] = [];
+    params.set("limit", "500");
+    for (;;) {
+      params.set("offset", String(rows.length));
+      const page = await this.request<TransactionRecord[]>("transactions", `?${params}`);
+      if (page.length === 0) return rows;
+      rows.push(...page);
+    }
   }
   async findBySourceReference(reference: string) {
     const safe = reference.replace(/[%,()*]/g, "");
@@ -60,7 +71,13 @@ export class SupabaseRepository implements FinanceRepository {
   }
   async updateTransaction(id: string, patch: Partial<TransactionRecord>) {
     const rows = await this.request<TransactionRecord[]>("transactions", `?transaction_id=eq.${encodeURIComponent(id)}`, {
-      method: "PATCH", body: JSON.stringify({ ...patch, transaction_id: undefined, updated_at: new Date().toISOString() }),
+      method: "PATCH", body: JSON.stringify({
+        ...patch,
+        ...(patch.fx_rate === "" && { fx_rate: null }),
+        ...(patch.fx_rate_date === "" && { fx_rate_date: null }),
+        transaction_id: undefined,
+        updated_at: new Date().toISOString(),
+      }),
     });
     if (rows.length !== 1) throw new Error("Transaction not found");
     return rows[0];

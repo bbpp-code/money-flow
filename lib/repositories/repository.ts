@@ -1,7 +1,7 @@
 import type { BudgetRecord, CategoryRule, TransactionRecord } from "@/lib/types";
 
 export interface FinanceRepository {
-  listTransactions(filters?: { month?: string; query?: string; category?: string }): Promise<TransactionRecord[]>;
+  listTransactions(filters?: { month?: string; query?: string; category?: string; id?: string }): Promise<TransactionRecord[]>;
   findBySourceReference(reference: string): Promise<TransactionRecord[]>;
   createTransactions(records: TransactionRecord[]): Promise<TransactionRecord[]>;
   updateTransaction(id: string, patch: Partial<TransactionRecord>): Promise<TransactionRecord>;

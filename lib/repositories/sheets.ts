@@ -31,11 +31,12 @@ export class SheetsRepository implements FinanceRepository {
     return response.data.values ?? [];
   }
 
-  async listTransactions(filters: { month?: string; query?: string; category?: string } = {}) {
+  async listTransactions(filters: Parameters<FinanceRepository["listTransactions"]>[0] = {}) {
     const rows = await this.values(TX_RANGE);
     return rows.slice(1).map(rowToTransaction).filter((t) => (!filters.month || t.date.startsWith(filters.month))
       && (!filters.query || `${t.description} ${t.original_text}`.toLowerCase().includes(filters.query.toLowerCase()))
-      && (!filters.category || t.category === filters.category)).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
+      && (!filters.category || t.category === filters.category)
+      && (!filters.id || t.transaction_id === filters.id)).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
   }
 
   async findBySourceReference(reference: string) {

@@ -8,6 +8,7 @@ export const voiceRequestSchema = z.object({
 
 export const transactionPatchSchema = z.object({
   description: z.string().trim().min(1).max(200).optional(),
+  amount_jpy: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   category: z.string().trim().min(1).max(100).optional(),
   subcategory: z.string().trim().max(100).optional(),
   review_status: z.enum(["confirmed", "needs_review"]).optional(),
