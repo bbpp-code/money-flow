@@ -24,3 +24,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ transaction, rule_suggestion: patch.category ? { keyword: transaction.description, category: patch.category, subcategory: patch.subcategory ?? transaction.subcategory } : null });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid request" }, { status: 400 }); }
 }
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!await requireOwner()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await context.params;
+  if (!/^[a-z0-9-]{1,128}$/i.test(id)) return NextResponse.json({ error: "รหัสรายการไม่ถูกต้อง" }, { status: 400 });
+  try {
+    await (await getRepository()).deleteTransaction(id);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("Transaction deletion failed", error);
+    return NextResponse.json({ error: "ลบรายการไม่สำเร็จ กรุณาลองอีกครั้ง" }, { status: 500 });
+  }
+}

@@ -5,6 +5,7 @@ export interface FinanceRepository {
   findBySourceReference(reference: string): Promise<TransactionRecord[]>;
   createTransactions(records: TransactionRecord[]): Promise<TransactionRecord[]>;
   updateTransaction(id: string, patch: Partial<TransactionRecord>): Promise<TransactionRecord>;
+  deleteTransaction(id: string): Promise<void>;
   listCategoryRules(): Promise<CategoryRule[]>;
   listBudgets(month?: string): Promise<BudgetRecord[]>;
   upsertBudget(budget: BudgetRecord): Promise<BudgetRecord>;

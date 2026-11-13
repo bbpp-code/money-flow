@@ -223,8 +223,24 @@ function EditTransaction({ row, onClose, onSaved }: { row: TransactionRecord; on
   const dialog = useRef<HTMLDialogElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const cancelDelete = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { dialog.current?.showModal(); }, []);
+  useEffect(() => { if (confirmDelete) cancelDelete.current?.focus(); }, [confirmDelete]);
+
+  async function remove() {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/transactions/${encodeURIComponent(row.transaction_id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("ลบรายการไม่สำเร็จ กรุณาลองอีกครั้ง");
+      onSaved();
+    } catch {
+      setError("ลบรายการไม่สำเร็จ กรุณาลองอีกครั้ง");
+      setSaving(false);
+    }
+  }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -256,9 +272,15 @@ function EditTransaction({ row, onClose, onSaved }: { row: TransactionRecord; on
     }
   }
 
-  return <dialog ref={dialog} className="modal edit-dialog" aria-labelledby="edit-title" onCancel={(event) => { event.preventDefault(); if (!saving) onClose(); }}>
-    <div className="card-head"><h2 id="edit-title">แก้ไขรายการ</h2><span>{row.date}</span></div>
-    <form onSubmit={save}>
+  function cancel() {
+    if (saving) return;
+    if (confirmDelete) { setConfirmDelete(false); setError(""); }
+    else onClose();
+  }
+
+  return <dialog ref={dialog} className="modal edit-dialog" aria-labelledby="edit-title" onCancel={(event) => { event.preventDefault(); cancel(); }}>
+    <div className="card-head"><h2 id="edit-title">{confirmDelete ? "ยืนยันการลบรายการ" : "แก้ไขรายการ"}</h2><span>{row.date}</span></div>
+    <form onSubmit={save} hidden={confirmDelete}>
       <label>ชื่อรายการ<Input name="description" defaultValue={row.description} maxLength={200} required/></label>
       <label>จำนวนเงิน (JPY)<Input name="amount_jpy" type="number" inputMode="numeric" min={row.amount_jpy === 0 ? 0 : 1} step="1" max={Number.MAX_SAFE_INTEGER} defaultValue={row.amount_jpy ?? ""}/></label>
       {row.original_currency !== "JPY" && <p className="summary-note">ยอดสกุลเดิม {row.original_amount} {row.original_currency} · ยอดเยนที่แก้จะใช้คำนวณใน Dashboard</p>}
@@ -266,9 +288,22 @@ function EditTransaction({ row, onClose, onSaved }: { row: TransactionRecord; on
         {Array.from(new Set([row.category, ...CATEGORIES])).map((category) => <option key={category}>{category}</option>)}
       </Select></label>
       {row.review_status === "needs_review" && <label className="edit-check"><input type="checkbox" name="confirm_category"/> ยืนยันว่าตรวจสอบรายการแล้ว</label>}
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="edit-actions"><Button type="button" variant="secondary" onClick={onClose} disabled={saving}>ยกเลิก</Button><Button type="submit" disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}</Button></div>
+      {!confirmDelete && error && <p className="form-error" role="alert">{error}</p>}
+      <div className="edit-actions">
+        <Button type="button" variant="ghost" className="delete-trigger" disabled={saving} onClick={() => { setConfirmDelete(true); setError(""); }}>ลบรายการ</Button>
+        <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>ยกเลิก</Button>
+        <Button type="submit" disabled={saving}>{saving ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}</Button>
+      </div>
     </form>
+    {confirmDelete && <div className="delete-confirm">
+      <p><strong>{row.description}</strong> · {row.amount_jpy === null ? `${row.original_amount} ${row.original_currency}` : money.format(row.amount_jpy)}</p>
+      <p>รายการนี้จะถูกลบถาวรและนำออกจากยอดสรุป</p>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="edit-actions">
+        <button ref={cancelDelete} type="button" className="button button-secondary" onClick={cancel} disabled={saving}>กลับไปแก้ไข</button>
+        <Button type="button" className="delete-confirm-button" onClick={remove} disabled={saving}>{saving ? "กำลังลบ…" : "ยืนยันลบ"}</Button>
+      </div>
+    </div>}
   </dialog>;
 }
 

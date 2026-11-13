@@ -82,6 +82,10 @@ export class SupabaseRepository implements FinanceRepository {
     if (rows.length !== 1) throw new Error("Transaction not found");
     return rows[0];
   }
+  async deleteTransaction(id: string) {
+    const params = new URLSearchParams({ transaction_id: `eq.${id}` });
+    await this.request("transactions", `?${params}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+  }
   async listCategoryRules(): Promise<CategoryRule[]> {
     const rows = await this.request<Array<CategoryRule & { categories: { name_th: string } | null }>>("category_rules", "?select=*,categories(name_th)&enabled=eq.true&order=priority.desc");
     return rows.map((row) => ({ ...row, category_name: row.categories?.name_th || row.category_id }));

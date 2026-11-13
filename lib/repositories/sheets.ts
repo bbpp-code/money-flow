@@ -33,7 +33,7 @@ export class SheetsRepository implements FinanceRepository {
 
   async listTransactions(filters: Parameters<FinanceRepository["listTransactions"]>[0] = {}) {
     const rows = await this.values(TX_RANGE);
-    return rows.slice(1).map(rowToTransaction).filter((t) => (!filters.month || t.date.startsWith(filters.month))
+    return rows.slice(1).filter((row) => row[0]).map(rowToTransaction).filter((t) => (!filters.month || t.date.startsWith(filters.month))
       && (!filters.query || `${t.description} ${t.original_text}`.toLowerCase().includes(filters.query.toLowerCase()))
       && (!filters.category || t.category === filters.category)
       && (!filters.id || t.transaction_id === filters.id)).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
@@ -63,6 +63,14 @@ export class SheetsRepository implements FinanceRepository {
       requestBody: { values: [transactionToRow(updated)] },
     });
     return updated;
+  }
+
+  async deleteTransaction(id: string) {
+    const rows = await this.values(TX_RANGE);
+    const index = rows.findIndex((row, index) => index > 0 && row[0] === id);
+    if (index < 0) return;
+    const row = index + 1;
+    await getSheetsClient().spreadsheets.values.clear({ spreadsheetId: this.spreadsheetId, range: `Transactions!A${row}:U${row}` });
   }
 
   async listCategoryRules(): Promise<CategoryRule[]> {

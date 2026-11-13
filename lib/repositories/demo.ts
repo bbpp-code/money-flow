@@ -47,6 +47,9 @@ export class DemoRepository implements FinanceRepository {
       && (!filters.id || t.transaction_id === filters.id)).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
   }
   async findBySourceReference(reference: string) { return store.transactions.filter((t) => t.source_reference === reference || t.source_reference.startsWith(`${reference}:`)); }
+  async deleteTransaction(id: string) {
+    store.transactions = store.transactions.filter((transaction) => transaction.transaction_id !== id);
+  }
   async createTransactions(records: TransactionRecord[]) { store.transactions.push(...records); return records; }
   async updateTransaction(id: string, patch: Partial<TransactionRecord>) {
     const index = store.transactions.findIndex((t) => t.transaction_id === id);

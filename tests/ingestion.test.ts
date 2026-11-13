@@ -6,6 +6,7 @@ import { ingestVoice } from "@/lib/services/transactions";
 class MemoryRepository implements FinanceRepository {
   transactions: TransactionRecord[] = []; failWrites = false;
   async listTransactions() { return this.transactions; }
+  async deleteTransaction(id: string) { this.transactions = this.transactions.filter((transaction) => transaction.transaction_id !== id); }
   async findBySourceReference(reference: string) { return this.transactions.filter((t) => t.source_reference === reference || t.source_reference.startsWith(`${reference}:`)); }
   async createTransactions(records: TransactionRecord[]) { if (this.failWrites) throw new Error("Sheets unavailable"); this.transactions.push(...records); return records; }
   async updateTransaction(id: string, patch: Partial<TransactionRecord>) { const index=this.transactions.findIndex((t)=>t.transaction_id===id); if(index<0) throw new Error("Not found"); return this.transactions[index]={...this.transactions[index],...patch}; }
