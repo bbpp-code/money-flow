@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FinanceRepository } from "@/lib/repositories/repository";
 import type { BudgetRecord, CategoryRule, TransactionRecord } from "@/lib/types";
 import { ingestVoice } from "@/lib/services/transactions";
@@ -20,6 +20,38 @@ class MemoryRepository implements FinanceRepository {
 }
 
 describe("voice ingestion", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("opts in to Groq only for unmatched iPhone expenses, without sending or changing the amount", async () => {
+    const repository = new MemoryRepository();
+    vi.stubEnv("GROQ_API_KEY", "test-key");
+    vi.stubEnv("GROQ_CATEGORY_ENABLED", "false");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
+      choices: [{ message: { content: JSON.stringify({ categories: ["อาหารและเครื่องดื่ม"] }) } }],
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = { text: "ขนมปังเซเว่น 187 เยน", source: "iphone_shortcut" };
+    await ingestVoice({ ...payload, client_request_id: "groq-disabled" }, repository);
+    vi.stubEnv("GROQ_CATEGORY_ENABLED", "true");
+    await ingestVoice({ ...payload, source: "google_docs_import", client_request_id: "groq-import" }, repository);
+    await ingestVoice({ ...payload, text: "กาแฟ 250 เยน", client_request_id: "groq-known" }, repository);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const result = await ingestVoice({ ...payload, client_request_id: "groq-unknown" }, repository);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(JSON.parse(request.messages[1].content)).toEqual(["ขนมปังเซเว่น"]);
+    expect(result.transactions[0]).toMatchObject({ category: "อาหารและเครื่องดื่ม", amount_jpy: 187, review_status: "needs_review" });
+
+    fetchMock.mockRejectedValueOnce(new Error("Groq unavailable"));
+    const fallback = await ingestVoice({ ...payload, client_request_id: "groq-fallback" }, repository);
+    expect(fallback.transactions[0]).toMatchObject({ category: "อื่นๆ", amount_jpy: 187, review_status: "needs_review" });
+  });
+
   it("returns the persisted record and makes retries idempotent", async () => {
     const repository = new MemoryRepository();
     const payload = { text: "กาแฟ 250 เยน", source: "iphone_shortcut", client_request_id: "request-001" };

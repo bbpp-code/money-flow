@@ -6,6 +6,7 @@ A private, Thai-first personal-finance app for life in Japan: Siri/Apple Shortcu
 
 - Thai/Japanese/English transaction parsing, explicit dates, multi-phrase input, JPY default metadata, stable UUIDs
 - user rules before deterministic category scoring; ambiguous entries go to review
+- Optional Groq category suggestions for unmatched iPhone expenses. To opt in, set `GROQ_API_KEY` as a server secret and `GROQ_CATEGORY_ENABLED=true`, then redeploy. Groq receives shortened descriptions with numbers, emails, and URLs removed. Suggestions remain marked for review. The app keeps the rule-based result if Groq is unavailable.
 - revocable device authentication, validation, rate limiting, duplicate retry protection, serialized writes
 - Supabase Postgres schema and server-only access; owner-only Google OAuth dashboard
 - transaction search/edit/manual entry, category budgets, charts, CSV, accurate browser-rendered Thai PNG
