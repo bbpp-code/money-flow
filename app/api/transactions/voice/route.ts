@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { ParseError, parseVoiceText } from "@/lib/parser";
@@ -6,10 +7,22 @@ import { voiceRequestSchema } from "@/lib/schema";
 import { checkRateLimit, verifyDeviceToken } from "@/lib/security";
 import { ingestVoice } from "@/lib/services/transactions";
 
-export async function POST(request: Request) {
+function checkAccess(request: Request) {
   if (!verifyDeviceToken(request)) return NextResponse.json({ success: false, error: { code: "unauthorized", message_th: "ไม่ได้รับอนุญาต" } }, { status: 401 });
-  const rateKey = request.headers.get("x-forwarded-for") || "device";
+  const rateKey = `${request.method}:${request.headers.get("x-forwarded-for") || "device"}`;
   if (!checkRateLimit(rateKey)) return NextResponse.json({ success: false, error: { code: "rate_limited", message_th: "ส่งรายการเร็วเกินไป กรุณาลองใหม่" } }, { status: 429 });
+}
+
+export async function GET(request: Request) {
+  const denied = checkAccess(request);
+  if (denied) return denied;
+
+  return NextResponse.json({ client_request_id: randomUUID() }, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function POST(request: Request) {
+  const denied = checkAccess(request);
+  if (denied) return denied;
   try {
     const payload = voiceRequestSchema.parse(await request.json());
     const repository = await getRepository();
@@ -35,7 +48,7 @@ export async function POST(request: Request) {
       const message = field === "text" && (error.issues[0]?.code === "too_small" || error.issues[0]?.code === "invalid_type")
         ? "แอปไม่ได้รับข้อความจากคำพูด ให้เลือกผลลัพธ์ของ Dictate Text ในช่อง text แล้วลองอีกครั้ง"
         : field === "client_request_id"
-          ? "ตรวจสอบช่อง client_request_id ให้ใช้ผลลัพธ์ Formatted Date ในรูปแบบ yyyyMMddHHmmssSSS"
+          ? "ตรวจสอบช่อง client_request_id ให้ใช้รหัสจากขั้นตอน GET ของ MoneyFlow"
           : "ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบข้อความและการตั้งค่า Shortcut";
       return NextResponse.json({ success: false, error: { code: "invalid_request", message_th: message, details: error.issues } }, { status: 400 });
     }

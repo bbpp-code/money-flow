@@ -6,19 +6,19 @@ The API accepts Thai UTF-8 and keeps the existing “dictate then POST” shape.
 
 1. Add **Dictate Text**. Language: **Thai (Thailand)**. Stop Listening: **After Pause**.
 2. Add **Set Variable** immediately after Dictate Text. Name it `Spoken Expense` and set its input explicitly to the output of Dictate Text. Add an **If** check: if `Spoken Expense` does not have any value, show an alert and use **Stop This Shortcut**.
-3. Add **Current Date**, then **Format Date**. In Format Date, choose **Custom** and enter `yyyyMMddHHmmssSSS` as the format string. This produces a request ID such as `20261113142307158` using built-in actions. Keep these actions before the network request so a retry of the same request reuses the same ID.
-4. Add **Get Contents of URL**.
+3. Add **Get Contents of URL** with method **GET**. Use `https://YOUR_DOMAIN/api/transactions/voice` and the same Authorization header as the POST. Add **Get Dictionary Value** immediately after it, with key `client_request_id` and input set to the GET response. Select this value explicitly in the POST. A correctly configured Shortcut can also keep using its existing unique formatted date ID.
+4. Add a second **Get Contents of URL** with method **POST**.
    - URL: `https://YOUR_DOMAIN/api/transactions/voice`
    - Method: `POST`
    - Headers: `Authorization` = `Bearer YOUR_DEVICE_TOKEN`
    - Request Body: `JSON`
-   - Add three **Text** fields directly under Request Body: `text` = variable **Spoken Expense**, `source` = `iphone_shortcut`, `client_request_id` = variable **Formatted Date**. Select the variables from the variable picker.
+   - Add three **Text** fields directly under Request Body: `text` = variable **Spoken Expense**, `source` = `iphone_shortcut`, `client_request_id` = the **Dictionary Value** from step 3. Select the variables from the variable picker.
 5. Add **Get Dictionary Value**. Key: `success`, Dictionary: **Contents of URL**.
 6. Add **If** where the value **is 1** (true).
 7. Inside If: add **Get Dictionary Value**, key `confirmation_th`, then **Speak Text** and optionally **Show Notification** using that value.
 8. Inside Otherwise: add **Get Dictionary Value**, key `error`; then another **Get Dictionary Value**, key `message_th`; use **Show Alert**. This prevents a failed request from sounding saved.
 
-Do not reuse the request ID after the Shortcut has confirmed success. If iOS retries the same network action, reuse the same formatted date value: the API returns the prior saved record with `duplicate: true`.
+Get a fresh request ID for each new expense. If you retry the POST within the same run, reuse the ID already fetched in step 3. The API returns the prior saved record with `duplicate: true`.
 
 To troubleshoot without saving, add `?preview=1` to the voice URL in the copied Shortcut and put **Show Result** (input: **Contents of URL**) immediately after the POST. Temporarily type `กาแฟ 250 เยน` into the JSON `text` field and run it once; `status: preview` confirms the request settings work. Restore **Spoken Expense** in that field and repeat by voice. If the typed preview works but the voice preview reports an empty `text`, check what **Show Result** displays when fed **Spoken Expense** just before the POST. Once voice preview works, remove `?preview=1` and the temporary Show Result actions to enable saving and the normal confirmation.
 
