@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { ParseError } from "@/lib/parser";
+import { ParseError, parseVoiceText } from "@/lib/parser";
 import { getRepository } from "@/lib/repositories";
 import { voiceRequestSchema } from "@/lib/schema";
 import { checkRateLimit, verifyDeviceToken } from "@/lib/security";
@@ -12,7 +12,12 @@ export async function POST(request: Request) {
   if (!checkRateLimit(rateKey)) return NextResponse.json({ success: false, error: { code: "rate_limited", message_th: "ส่งรายการเร็วเกินไป กรุณาลองใหม่" } }, { status: 429 });
   try {
     const payload = voiceRequestSchema.parse(await request.json());
-    const result = await ingestVoice(payload, await getRepository());
+    const repository = await getRepository();
+    if (new URL(request.url).searchParams.get("preview") === "1") {
+      const parsed = parseVoiceText(payload.text, { rules: await repository.listCategoryRules() });
+      return NextResponse.json({ success: true, status: "preview", preview_th: `แอปอ่านได้: ${parsed.map((item) => `${item.description} ${item.amount} ${item.currency}`).join(" / ")} (ยังไม่ได้บันทึก)` });
+    }
+    const result = await ingestVoice(payload, repository);
     const transactions = result.transactions.map((t) => ({
       transaction_id: t.transaction_id, description: t.description, amount_jpy: t.amount_jpy,
       original_amount: t.original_amount, original_currency: t.original_currency, type: t.type,
@@ -25,7 +30,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, duplicate: result.duplicate, status: transactions.some((t) => t.review_status === "needs_review") ? "needs_review" : "saved", transactions, transaction: transactions.length === 1 ? first : undefined, confirmation_th: confirmation });
   } catch (error) {
     if (error instanceof ParseError) return NextResponse.json({ success: false, status: "needs_input", error: { code: error.code, message_th: error.message } }, { status: 422 });
-    if (error instanceof ZodError) return NextResponse.json({ success: false, error: { code: "invalid_request", message_th: "ข้อมูลไม่ถูกต้อง", details: error.issues } }, { status: 400 });
+    if (error instanceof ZodError) {
+      const field = error.issues[0]?.path[0];
+      const message = field === "text" && (error.issues[0]?.code === "too_small" || error.issues[0]?.code === "invalid_type")
+        ? "แอปไม่ได้รับข้อความจากคำพูด ให้เลือกผลลัพธ์ของ Dictate Text ในช่อง text แล้วลองอีกครั้ง"
+        : field === "client_request_id"
+          ? "ตรวจสอบช่อง client_request_id ให้ใช้ผลลัพธ์ Formatted Date ในรูปแบบ yyyyMMddHHmmssSSS"
+          : "ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบข้อความและการตั้งค่า Shortcut";
+      return NextResponse.json({ success: false, error: { code: "invalid_request", message_th: message, details: error.issues } }, { status: 400 });
+    }
     console.error("Voice ingestion failed", error);
     return NextResponse.json({ success: false, error: { code: "persistence_failed", message_th: "ยังไม่ได้บันทึก กรุณาลองใหม่" } }, { status: 503 });
   }
