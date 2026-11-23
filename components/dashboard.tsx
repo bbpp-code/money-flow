@@ -17,8 +17,9 @@ type Report = {
 type Scope = "month" | "all";
 type ApiData = { month: string; scope: Scope; lastSync: string; demoMode: boolean; transactions: TransactionRecord[]; budgets: BudgetRecord[]; report: Report };
 type Tab = "overview" | "transactions" | "budgets" | "reports";
+type ExpensePeriod = { period: string; label: string; amount: number; categories: Record<string, number> };
 
-const COLORS = ["#264d43", "#d77454", "#d9b66f", "#76988e", "#856f5d", "#b6a590"];
+const COLORS = ["#264d43", "#d77454", "#d9b66f", "#76988e", "#856f5d", "#b6a590", "#637aaa", "#ad7092", "#8d9d5a", "#606668"];
 const CATEGORIES = ["อาหารและเครื่องดื่ม", "รถยนต์และการเดินทาง", "ท่องเที่ยวและพักผ่อน", "งานอดิเรก", "เทคโนโลยี", "สุขภาพ", "ของใช้ในบ้าน", "ดูแลส่วนตัว", "อื่นๆ", "รายรับ"];
 const money = new Intl.NumberFormat("th-TH", { style: "currency", currency: "JPY", maximumFractionDigits: 0 });
 const shortMoney = new Intl.NumberFormat("th-TH", { notation: "compact", maximumFractionDigits: 1 });
@@ -131,12 +132,60 @@ function Overview({ data, trend, setTab, onRefresh }: { data: ApiData; trend: Ar
   return <div className="page-stack">
     <section className="stats-grid"><StatCard label={`รายรับ${periodLabel}`} value={money.format(report.income)} icon={<ArrowDownLeft/>} tone="income"/><StatCard label={`รายจ่าย${periodLabel}`} value={money.format(report.expenses)} icon={<ArrowUpRight/>} tone="expense"/><StatCard label="กระแสเงินสุทธิ" value={money.format(report.netCashFlow)} icon={<WalletCards/>} tone="net"/><StatCard label="จำนวนรายการ" value={`${report.transactionCount} รายการ`} icon={<FileText/>}/></section>
     {report.incompleteJpyCount > 0 && <p className="summary-note">ยังไม่รวม {report.incompleteJpyCount} รายการที่ไม่มียอดเป็นเยน</p>}
-    <section className="charts-grid"><Card className="chart-card wide"><div className="card-head"><div><h2>{allTime ? "แนวโน้มรายจ่ายรายเดือน" : "แนวโน้มรายจ่ายรายวัน"}</h2></div><Badge>JPY</Badge></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend}><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#264d43" stopOpacity={0.35}/><stop offset="1" stopColor="#264d43" stopOpacity={0.02}/></linearGradient></defs><CartesianGrid vertical={false} stroke="#e8e1d5"/><XAxis dataKey="period" axisLine={false} tickLine={false}/><YAxis tickFormatter={(v) => shortMoney.format(v)} axisLine={false} tickLine={false}/><Tooltip formatter={(v) => money.format(Number(v))}/><Area type="monotone" dataKey="amount" stroke="#264d43" strokeWidth={3} fill="url(#area)"/></AreaChart></ResponsiveContainer></div></Card>
+    <section className="charts-grid"><ExpenseTrendChart data={data} trend={trend}/>
       <Card className="chart-card"><div className="card-head"><div><p className="eyebrow">CATEGORY MIX</p><h2>รายจ่ายตามหมวด</h2></div></div><div className="donut-wrap"><ResponsiveContainer width="52%" height={220}><PieChart><Pie data={report.categorySpending} dataKey="amount" nameKey="category" innerRadius={60} outerRadius={90} paddingAngle={3}>{report.categorySpending.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}</Pie><Tooltip formatter={(v) => money.format(Number(v))}/></PieChart></ResponsiveContainer><div className="legend">{report.categorySpending.slice(0,5).map((item,i) => <div key={item.category}><i style={{background: COLORS[i % COLORS.length]}}/><span>{item.category}</span><b>{item.percentage}%</b></div>)}</div></div></Card></section>
     <section className="bottom-grid"><Card className="list-card"><div className="card-head"><div><p className="eyebrow">RECENT ACTIVITY</p><h2>รายการล่าสุด</h2></div><button className="text-link" onClick={() => setTab("transactions")}>{allTime ? "ดูรายการรายเดือน" : "ดูทั้งหมด"} <ChevronRight/></button></div><TransactionList rows={data.transactions.slice(0,6)} editable onRefresh={onRefresh}/></Card>
       <div className="side-stack">{!allTime && <Card className="budget-mini"><div className="card-head"><div><p className="eyebrow">BUDGET PULSE</p><h2>สถานะงบประมาณ</h2></div></div>{report.budgetUsage.length ? report.budgetUsage.slice(0,4).map((b) => <div className="budget-row" key={b.category_id}><div><span>{b.category_id}</span><b>{Math.round(b.percentage)}%</b></div><div className="progress"><i style={{width: `${Math.min(b.percentage,100)}%`}} className={b.percentage >= 100 ? "over" : b.percentage >= 80 ? "warn" : ""}/></div><small>{money.format(b.spent)} / {money.format(b.budget_jpy)}</small></div>) : <p className="empty">ยังไม่ได้กำหนดงบ</p>}</Card>}
       <Card className="top-expenses"><div className="card-head"><div><p className="eyebrow">TOP 5</p><h2>รายจ่ายสูงสุด</h2></div></div>{top.map((t,i) => <div key={t.transaction_id}><span>{i+1}</span><p>{t.description}<small>{t.category}</small></p><b>{money.format(t.amount_jpy ?? 0)}</b></div>)}</Card></div></section>
   </div>;
+}
+
+function ExpenseTrendChart({ data, trend }: { data: ApiData; trend: Array<{ period: string; amount: number }> }) {
+  const [chartMode, setChartMode] = useState<"line" | "stacked">("line");
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const allTime = data.scope === "all";
+  const periods = useMemo(() => {
+    const totals = new Map<string, ExpensePeriod>();
+    for (const row of data.transactions) {
+      if (row.type !== "expense" || row.amount_jpy === null || row.amount_jpy <= 0) continue;
+      const period = allTime ? row.date.slice(0, 7) : row.date;
+      const item = totals.get(period) ?? { period, label: allTime ? period : period.slice(8), amount: 0, categories: {} };
+      item.amount += row.amount_jpy;
+      item.categories[row.category] = (item.categories[row.category] ?? 0) + row.amount_jpy;
+      totals.set(period, item);
+    }
+    return [...totals.values()].sort((a, b) => a.period.localeCompare(b.period));
+  }, [data.transactions, allTime]);
+  const categories = [...new Set(periods.flatMap((item) => Object.keys(item.categories)))].sort((a, b) => {
+    const order = data.report.categorySpending.map((item) => item.category);
+    return order.indexOf(a) - order.indexOf(b);
+  });
+  const selected = periods.find((item) => item.period === selectedPeriod) ?? periods[periods.length - 1];
+  const maxAmount = Math.max(1, ...periods.map((item) => item.amount));
+  const periodLabel = (period: string) => allTime ? period : `${period.slice(8)}/${period.slice(5, 7)}/${period.slice(0, 4)}`;
+
+  return <Card className="chart-card wide">
+    <div className="card-head"><h2>{allTime ? "แนวโน้มรายจ่ายรายเดือน" : "แนวโน้มรายจ่ายรายวัน"}</h2><Badge>JPY</Badge></div>
+    <div className="chart-switch" role="group" aria-label="รูปแบบกราฟรายจ่าย">
+      <button type="button" className={chartMode === "line" ? "active" : ""} aria-pressed={chartMode === "line"} onClick={() => setChartMode("line")}>กราฟเส้น</button>
+      <button type="button" className={chartMode === "stacked" ? "active" : ""} aria-pressed={chartMode === "stacked"} onClick={() => setChartMode("stacked")}>กราฟแท่งตามหมวด</button>
+    </div>
+    {chartMode === "line" ? <div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend}><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#264d43" stopOpacity={0.35}/><stop offset="1" stopColor="#264d43" stopOpacity={0.02}/></linearGradient></defs><CartesianGrid vertical={false} stroke="#e8e1d5"/><XAxis dataKey="period" axisLine={false} tickLine={false}/><YAxis tickFormatter={(v) => shortMoney.format(v)} axisLine={false} tickLine={false}/><Tooltip formatter={(v) => money.format(Number(v))}/><Area type="monotone" dataKey="amount" stroke="#264d43" strokeWidth={3} fill="url(#area)"/></AreaChart></ResponsiveContainer></div>
+      : <>
+        {periods.length ? <div className="stacked-chart">
+          <div className="stacked-scale" aria-hidden="true"><span>{shortMoney.format(maxAmount)}</span><span>{shortMoney.format(maxAmount / 2)}</span><span>0</span></div>
+          <div className="stacked-scroll" aria-label={`กราฟรายจ่าย${allTime ? "รายเดือน" : "รายวัน"} เลื่อนแนวนอนเพื่อดูช่วงอื่น`}>
+            <div className="stacked-bars">{periods.map((item) => <button key={item.period} type="button" className={`stacked-day-button ${selected?.period === item.period ? "selected" : ""}`} aria-pressed={selected?.period === item.period} aria-label={`${allTime ? "เดือน" : "วันที่"} ${periodLabel(item.period)} รายจ่ายรวม ${money.format(item.amount)} แตะเพื่อดูรายละเอียด`} onClick={() => setSelectedPeriod(item.period)}>
+              <span className="stacked-bar-track"><span className="stacked-bar-total" style={{ height: `${item.amount / maxAmount * 100}%` }}>
+                {categories.filter((category) => item.categories[category] > 0).map((category) => <span key={category} className="stacked-segment" style={{ height: `${item.categories[category] / item.amount * 100}%`, backgroundColor: COLORS[categories.indexOf(category) % COLORS.length] }}/>) }
+              </span></span><span className="stacked-day-label">{item.label}</span>
+            </button>)}</div>
+          </div>
+        </div> : <p className="empty">ยังไม่มีรายจ่ายในช่วงนี้</p>}
+        {categories.length > 0 && <div className="stacked-legend" aria-label="สีของหมวดหมู่">{categories.map((category, index) => <span key={category}><i style={{ backgroundColor: COLORS[index % COLORS.length] }}/>{category}</span>)}</div>}
+        {selected && <div className="day-breakdown" aria-live="polite"><div className="day-breakdown-head"><strong>{allTime ? "เดือน" : "วันที่"} {periodLabel(selected.period)}</strong><b>รวม {money.format(selected.amount)}</b></div><div className="day-breakdown-list">{categories.filter((category) => selected.categories[category] > 0).map((category) => <div key={category}><span><i style={{ backgroundColor: COLORS[categories.indexOf(category) % COLORS.length] }}/>{category}</span><strong>{money.format(selected.categories[category])}</strong></div>)}</div></div>}
+      </>}
+  </Card>;
 }
 
 const calendarMonth = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "UTC" });

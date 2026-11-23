@@ -40,3 +40,32 @@
 .edit-actions{flex-wrap:wrap}
 .delete-trigger{margin-right:auto;color:#9d3028}
 .delete-confirm-button,.delete-confirm-button:hover{background:#9d3028;color:#fff}
+
+@import "tailwindcss";
+
+.chart-switch{display:inline-flex;flex-wrap:wrap;gap:4px;margin-top:16px;padding:4px;border:1px solid var(--line);border-radius:12px;background:#f0ece4}
+.chart-switch button{min-height:44px;padding:8px 14px;border:0;border-radius:9px;background:transparent;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.chart-switch button.active{background:var(--surface);color:var(--forest);box-shadow:0 2px 8px rgba(63,56,45,.12)}
+.chart-switch button:focus-visible,.stacked-day-button:focus-visible{outline:2px solid var(--forest);outline-offset:2px}
+.stacked-chart{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;margin-top:18px}
+.stacked-scale{height:220px;display:flex;flex-direction:column;justify-content:space-between;text-align:right;color:var(--muted);font-size:11px}
+.stacked-scroll{min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin}
+.stacked-bars{display:flex;align-items:flex-end;gap:4px;min-width:max-content;height:248px;background:linear-gradient(to bottom,#e8e1d5 1px,transparent 1px,transparent 50%,#e8e1d5 50%,transparent calc(50% + 1px),transparent calc(100% - 1px),#e8e1d5 calc(100% - 1px)) top/100% 220px no-repeat}
+.stacked-day-button{width:44px;height:248px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 3px;border:0;background:transparent;color:var(--muted);cursor:pointer;touch-action:manipulation}
+.stacked-day-button:hover .stacked-bar-track,.stacked-day-button.selected .stacked-bar-track{background:rgba(38,77,67,.07)}
+.stacked-bar-track{width:100%;height:220px;display:flex;align-items:flex-end;justify-content:center;border-radius:4px}
+.stacked-bar-total{width:24px;min-height:2px;display:flex;flex-direction:column-reverse;overflow:hidden;border-radius:4px 4px 0 0}
+.stacked-segment{display:block;width:100%;flex:none}
+.stacked-day-button.selected .stacked-bar-total{box-shadow:0 0 0 2px var(--ink)}
+.stacked-day-label{height:28px;display:grid;place-items:center;font-size:11px;font-weight:700}
+.stacked-day-button.selected .stacked-day-label{color:var(--forest)}
+.stacked-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:16px;color:var(--ink);font-size:11px}
+.stacked-legend span,.day-breakdown-list span{display:inline-flex;align-items:center;gap:7px}
+.stacked-legend i,.day-breakdown-list i{width:10px;height:10px;flex:none;border-radius:2px}
+.day-breakdown{margin-top:16px;padding:15px;border:1px solid var(--line);border-radius:11px;background:#f6f3ed}
+.day-breakdown-head,.day-breakdown-list>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.day-breakdown-head{padding-bottom:10px;border-bottom:1px solid var(--line);font-size:13px}
+.day-breakdown-head b{color:var(--forest)}
+.day-breakdown-list>div{padding-top:10px;font-size:12px}
+.day-breakdown-list strong{white-space:nowrap}
+@media(max-width:760px){.chart-switch{display:flex;width:100%}.chart-switch button{flex:1;padding-inline:8px;font-size:12px}.stacked-chart{grid-template-columns:42px minmax(0,1fr)}.day-breakdown{padding:12px}}
